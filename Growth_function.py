@@ -5,6 +5,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 import pandas as pd
+import random as ran
 
 # User imput variables
 time = 200 #s  - input desired duration
@@ -64,4 +65,17 @@ plt.plot(t,radius)
 plt.figure(1)
 plt.plot(t,con)
 
+
+#%%
+
+r_range = max(radius) + min(radius)
+max_rad = max(radius)
+x = [ran.random()*r_range for i in range(nuclii)]
+y = [ran.random()*r_range for i in range(nuclii)]
+
+
+for i in range(0,len(t), int(0.05*max(t))):
+    plt.figure(i+2)
+    plt.scatter(x, y, s=np.ones_like(x)*3000*radius[i])
+    plt.axis([0.0, max_rad, 0.0, max_rad])
 # %%

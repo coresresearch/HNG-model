@@ -9,12 +9,12 @@ import pandas as pd
 # User imput variables
 time = 200 #s  - input desired duration
 n_0 = 0  #input how many nucleations are already present
-c_k = 1.1 #concentratiosn of precipitant - should be in kmol/m³
+c_k = 1.2 #concentratiosn of precipitant - should be in kmol/m³
 co_k = 1 #100% saturation - should be in kmol/m³
 S = c_k/co_k
 
 #growth
-k_grow =3 #mol/m²/s
+k_grow = 0.5 #mol/m²/s
 n = 2 #reaction constant
 
 #constants
@@ -45,14 +45,19 @@ print (A_spec)
 
 def growth(t,varbs_array):
     radius, conc = varbs_array #indicates variable array because I forget
-    drad_dt = m.tanh(4*conc)*mol_vol*k_grow*(conc-1)**n
-    dconc_dt = - m.tanh(4*conc)*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k # distrute change in mass to electrolyte
+    drad_dt = mol_vol*k_grow*(conc-1)**n
+    dconc_dt = - nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k # distribute concentration change into total electrolyte
+#    drad_dt = (.5*m.tanh(180*(conc-1)+.5))*mol_vol*k_grow*(conc-1)**n
+#    dconc_dt = - (.5*m.tanh(180*(conc-1)+.5))*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k
+#    drad_dt = m.tanh(30*(conc-1))*mol_vol*k_grow*(conc-1)**n
+#    dconc_dt = - m.tanh(30*(conc-1))*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k  distrute change in mass to electrolyte
     return [drad_dt, dconc_dt]
 
 growth_sen = solve_ivp(growth, timespan, sol_vec) #growth senario
 
 radius = growth_sen.y[0]
 con = growth_sen.y[1]
+print(con)
 t = growth_sen.t
 plt.figure(0)
 plt.plot(t,radius)

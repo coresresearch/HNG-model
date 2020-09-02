@@ -18,9 +18,8 @@ n_0 = 0  #input how many nucleii are already present
 c_k = 1.2 #concentratiosn of solute - should be in kmol/m³
 T = 298 #K
 
-# Solution, solute, and precipitate properties
+# Thermo properties
 c_k_sat = 1 # Solute concentration at 100% saturation - should be in kmol/m³
-#TODO #1
 surf_energy = 0.54 #J / m² surface energy of solid product, should be Li₂O₂, temporary data for lithium, ... (http://crystalium.materialsvirtuallab.org/) can probably be done with cantera?
 MW = 45.881 #kg/kmol
 den =2310 #kg/m³ 2.31 #g/cm³
@@ -28,6 +27,7 @@ den =2310 #kg/m³ 2.31 #g/cm³
 # Growth reaction parameters
 k_grow = 0.5    # Rate coefficient (mol/m²/s)
 n = 2           # Reaction order (-)
+k_rev = 1   # Rate coefficient
 
 # Simulation domain:
 V_elect = 0.0005  #volume electrolyte m³
@@ -40,6 +40,8 @@ R = 8314.4 #J/K / kmol
 S = c_k/c_k_sat
 mol_vol = MW/den #m³/kmol
 
+
+
 #intializing the solution vector
 initial = {}
 initial['r_0'] = 2**surf_energy*(1/mol_vol)/(R*T*m.log(S)) #m
@@ -47,24 +49,24 @@ initial['r_0'] = 2**surf_energy*(1/mol_vol)/(R*T*m.log(S)) #m
 initial['S'] = c_k/c_k_sat #unitless
 sol_vec = list(initial.values())  # solution vector
 print(sol_vec)
+#Thermo Adjustments
+k_for = k_rev*m.exp(2*surf_energy/(mol_vol*R*T*initial['r_0']))
 
-#TODO #2
 A_spec = (10*initial['r_0'])**2/(V_elect)
 #Reaction surface area/volume of electrolyte, used if the rate of reactions is mol/m², I think used in nucleation, Specific surface of reaction (m²/m³) using r_0 for scale
 
-#TODO #3
 int_volume =  2/3*initial['r_0']**3
 #initiual volume of a nucleation
 
 nucleii = 10
-print (A_spec)
+
 
 #%%
 
 """======================== Define the residual function ========================"""
 def residual(t, solution):
     r, c_k = solution #indicates variable array because I forget
-    dr_dt = mol_vol*k_grow*(c_k-1.)**n
+    dr_dt = mol_vol*k_grow*(c_k-1.)**n-k_for*(2*m.pi*r**2)
     dc_dt = - nucleii*(dr_dt * 2 * m.pi * r**2)/mol_vol/V_elect/c_k_sat # distribute concentration change into total electrolyte
 #    drad_dt = (.5*m.tanh(180*(conc-1)+.5))*mol_vol*k_grow*(conc-1)**n
 #    dconc_dt = - (.5*m.tanh(180*(conc-1)+.5))*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k
@@ -83,6 +85,7 @@ concentrations = solution.y[1]
 print(concentrations)
 t = solution.t
 
+#redundent plot so it will show while the code is running.
 fig = plt.figure(0)
 plt.plot(t,radius)
 plt.figure(1)
@@ -100,11 +103,15 @@ y = [ran.random()*r_range for i in range(nucleii)]
 with PdfPages('output' +  dt.datetime.now().strftime("%Y%m%d") + '.pdf') as pdf:
     plt.figure(0)
     plt.plot(t,radius)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radius (m)")
     pdf.savefig()
     plt.close()
 
     plt.figure(1)
     plt.plot(t,concentrations)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Concentration (C/Ck)")
     pdf.savefig()
     plt.close()
 

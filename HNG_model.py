@@ -10,13 +10,14 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.integrate import solve_ivp
 
-"""=========================== User imput variables ==========================="""
+"""=========================== User input variables ==========================="""
 time = 200 #s  - input desired duration of simulation
 
 # Initial conditions
-n_0 = 0  #input how many nucleii are already present
-c_k = 1.2 #concentratiosn of solute - should be in kmol/m³
+n_0 = 10  #input how many nucleii are already present
+c_k = 1.2 #concentrations of solute - should be in kmol/m³
 T = 298 #K
+V_elect = 0.0005  #volume electrolyte m³
 
 # Thermo properties
 c_k_sat = 1 # Solute concentration at 100% saturation - should be in kmol/m³
@@ -25,32 +26,27 @@ MW = 45.881 #kg/kmol
 den =2310 #kg/m³ 2.31 #g/cm³
 
 # Growth reaction parameters
-k_grow = 0.5    # Rate coefficient (mol/m²/s)
-n = 2           # Reaction order (-)
-k_rev = 1   # Rate coefficient
+k_grow = 2    # Rate coefficient (mol/m²/s)
+n = 1           # Reaction order (-)
+k_r = 1   # Rate coefficient
 
-# Simulation domain:
-V_elect = 0.0005  #volume electrolyte m³
-
-"""=================== Initial calculations, problem set-up ==================="""
 # Constants
 R = 8314.4 #J/K / kmol
+"""=================== Initial calculations, problem set-up ==================="""
 
 # Initial parameter calculations:
 S = c_k/c_k_sat
-mol_vol = MW/den #m³/kmol
-
-
+mol_vol = den/MW #kmol/m³
 
 #intializing the solution vector
 initial = {}
-initial['r_0'] = 2**surf_energy*(1/mol_vol)/(R*T*m.log(S)) #m
+initial['r_0'] = 2**surf_energy*(mol_vol)/(R*T*m.log(S)) #m
 #initial['n_0'] =0 # nucleii
-initial['S'] = c_k/c_k_sat #unitless
+initial['S'] = S #unitless
 sol_vec = list(initial.values())  # solution vector
 print(sol_vec)
 #Thermo Adjustments
-k_for = k_rev*m.exp(2*surf_energy/(mol_vol*R*T*initial['r_0']))
+k_rev = k_r*m.exp(2*surf_energy*mol_vol/(R*T*initial['r_0']))
 
 A_spec = (10*initial['r_0'])**2/(V_elect)
 #Reaction surface area/volume of electrolyte, used if the rate of reactions is mol/m², I think used in nucleation, Specific surface of reaction (m²/m³) using r_0 for scale
@@ -58,21 +54,18 @@ A_spec = (10*initial['r_0'])**2/(V_elect)
 int_volume =  2/3*initial['r_0']**3
 #initiual volume of a nucleation
 
-nucleii = 10
-
-
 #%%
 
 """======================== Define the residual function ========================"""
 def residual(t, solution):
-    r, c_k = solution #indicates variable array because I forget
-    dr_dt = mol_vol*k_grow*(c_k-1.)**n-k_for*(2*m.pi*r**2)
-    dc_dt = - nucleii*(dr_dt * 2 * m.pi * r**2)/mol_vol/V_elect/c_k_sat # distribute concentration change into total electrolyte
+    r, s = solution #indicates variable array because I forget
+    dr_dt = MW/den*(k_grow*(s)**n-k_rev*(2*m.pi*r**2))
+    ds_dt = - n_0*(dr_dt * 2 * m.pi * r**2)*mol_vol/V_elect/c_k_sat # distribute concentration change into total electrolyte
 #    drad_dt = (.5*m.tanh(180*(conc-1)+.5))*mol_vol*k_grow*(conc-1)**n
-#    dconc_dt = - (.5*m.tanh(180*(conc-1)+.5))*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k
+#    dconc_dt = - (.5*m.tanh(180*(conc-1)+.5))*n_0*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k
 #    drad_dt = m.tanh(30*(conc-1))*mol_vol*k_grow*(conc-1)**n
-#    dconc_dt = - m.tanh(30*(conc-1))*nuclii*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k  distrute change in mass to electrolyte
-    return [dr_dt, dc_dt]
+#    dconc_dt = - m.tanh(30*(conc-1))*n_0*(drad_dt*2*m.pi*radius**2)/mol_vol/V_elect/co_k  distrute change in mass to electrolyte
+    return [dr_dt, ds_dt]
 
 """========================== Run the simulation =========================="""
 solution = solve_ivp(residual, [0, time], sol_vec) #growth senario
@@ -85,19 +78,12 @@ concentrations = solution.y[1]
 print(concentrations)
 t = solution.t
 
-#redundent plot so it will show while the code is running.
-fig = plt.figure(0)
-plt.plot(t,radius)
-plt.figure(1)
-plt.plot(t,concentrations)
-
-
 #%%
 
 r_range = max(radius) + min(radius)
 max_rad = max(radius)
-x = [ran.random()*r_range for i in range(nucleii)]
-y = [ran.random()*r_range for i in range(nucleii)]
+x = [ran.random()*r_range for i in range(n_0)]
+y = [ran.random()*r_range for i in range(n_0)]
 
 #%%
 with PdfPages('output' +  dt.datetime.now().strftime("%Y%m%d") + '.pdf') as pdf:
@@ -106,6 +92,7 @@ with PdfPages('output' +  dt.datetime.now().strftime("%Y%m%d") + '.pdf') as pdf:
     plt.xlabel("Time (s)")
     plt.ylabel("Radius (m)")
     pdf.savefig()
+    plt.show()
     plt.close()
 
     plt.figure(1)
@@ -113,6 +100,7 @@ with PdfPages('output' +  dt.datetime.now().strftime("%Y%m%d") + '.pdf') as pdf:
     plt.xlabel("Time (s)")
     plt.ylabel("Concentration (C/Ck)")
     pdf.savefig()
+    plt.show()
     plt.close()
 
     for i in range(0,len(t), int(0.01*max(t))):

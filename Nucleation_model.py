@@ -14,9 +14,9 @@ from scipy.integrate import solve_ivp
 k_B = 1.380649E-23 #J K-1 // Boltzmann's constant
 ep_0 = 8.854E-12  #F m-1 // electric permittivity of a vacuum
 N_a = 6.022E23 #mol-1 // Avogadro's number
-R = 8.3145 #J mol-1 K-1 // Ideal constant
+Rbar = 8.3145 #J mol-1 K-1 // Ideal constant
 
-"""=========================== User system variables ==========================="""
+"""======================== User system variables ========================="""
 #Parameters that can be changed during the trials
 T = 25 + 273.15 #K // Temperature
 C_LiO2_0 = 0.15 #mol m-3 // Electrolyte Concentration of LiO2 particles
@@ -25,9 +25,11 @@ Elyte_v = 1E-10 #uL3 // Electrolyte Volume
 N_0 = 0 # // Nucleations
 R_0 = 0
 A_0 = m.pi*0.009**2 #m2 // Cross sectional area
-time = 100000 #s // simulation time
+time = 500000 #s // simulation time
+atol = 1e-8 # absolute tolerance
+rtol = 1e-4 # relative tolerance
 
-"""=========================== User thermodyanic imputs ==========================="""
+"""======================== User thermodyanic imputs ========================"""
 #parameters that depend on the system being studied
 
 C_LiO2_sat = 0.1 #mol m-3 // saturated concentration of LiO2 //Yin (2017)
@@ -42,11 +44,11 @@ theta = 30*m.pi/180 # radians // Contact angle // Danner (2019) - should be repl
 D_LiO2 = 1.2E-9 #m2 -s-1 // diffusion ceofficient // Yin (2017)
 
 
-"""=========================== Thermodyanic system cals ==========================="""
+"""======================== Thermodyanic system cals ========================"""
 Elyte_v_SI = Elyte_v*1.0E-9 #
 phi = (2+m.cos(theta))*(1-m.cos(theta))**2/4  # - // contact angle correction factor
 
-"""=========================== Initialization step ==========================="""
+"""========================== Initialization step =========================="""
 #%%
 #intializing the solution vector
 initial = {}
@@ -65,7 +67,7 @@ print(sol_vec)
 def residual(t, solution):
     N, R, A, C_Li, C_LiO2 = solution
     a_d = (C_LiO2*N_a)**(-1/3) # length scale of diffusion
-    r_crit = 2*gamma_surf*V/(R*T*m.log(C_LiO2/C_LiO2_sat*C_Li/C_Li_sat)) # m // critical radius
+    r_crit = 2*gamma_surf*V/(Rbar*T*m.log(C_LiO2/C_LiO2_sat*C_Li/C_Li_sat)) # m // critical radius
     N_crit = 4/3*m.pi*r_crit**3*N_a/V # number of molecules in the critical nucleus of size
     Del_G_Crit = phi*4/3*m.pi*gamma_surf*r_crit**2 # J mol-1 // energy barrier of the nucleation
     Z = m.sqrt(Del_G_Crit/(phi*3*m.pi*k_B*T*N_crit)) # - // Zeldovich factor
@@ -77,9 +79,11 @@ def residual(t, solution):
     R_avg = (N*R + DN_Dt*r_crit)/(N + DN_Dt) # m // average radius to be replaced later
     Dravg_Dt = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(R_avg+D_LiO2/k_surf) - m.pi*R_avg**2*N*gamma_surf*k_surf_des
     DA_Dt = - DN_Dt*m.pi*r_crit**2 - 2*m.pi*R_avg*Dravg_Dt
+    
     return [DN_Dt, Dravg_Dt, DA_Dt, DCLi_Dt, DCLiO2_Dt]
 
-solution = solve_ivp(residual, [0, time], sol_vec)
+solution = solve_ivp(residual, [0, time], sol_vec, method='BDF',
+        rtol=rtol, atol=atol)
 
 nucleations = solution.y[0]
 area = solution.y[1]
@@ -92,8 +96,6 @@ plt.figure(0)
 plt.plot(t,nucleations)
 plt.xlabel("Time (s)")
 plt.ylabel("Nucleation (#)")
-plt.show()
-plt.close()
 
 plt.figure(1)
 plt.plot(t,Li_concentration)

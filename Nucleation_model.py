@@ -87,7 +87,8 @@ solution = solve_ivp(residual, [0, time], sol_vec, method='BDF',
 
 nucleations = solution.y[0]
 area = solution.y[1]
-Li_concentration = solution.y[2]
+radius = solution.y[2]
+Li_concentration = solution.y[3]
 
 print(nucleations, Li_concentration)
 t = solution.t

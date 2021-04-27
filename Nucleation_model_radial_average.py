@@ -21,11 +21,11 @@ Rbar = 8.3145 #J mol-1 K-1 // Ideal constant
 T = 25 + 273.15 #K // Temperature
 C_LiO2_0 = 0.15 #mol m-3 // Electrolyte Concentration of LiO2 particles
 C_Li_0 = 0.15 #mol m-3 // Electrolyte Concentration Li+ particles
-Elyte_v = 1E-10 #uL3 // Electrolyte Volume
+Elyte_v =1E-10 #uL // Electrolyte Volume
 N_0 = 0 # // Nucleations
 R_0 = 0
 A_0 = m.pi*0.009**2 #m2 // Cross sectional area
-time = 5000 #s // simulation time
+time = 500000 #s // simulation time
 atol = 1e-8 # absolute tolerance
 rtol = 1e-4 # relative tolerance
 
@@ -45,7 +45,7 @@ D_LiO2 = 1.2E-9 #m2 -s-1 // diffusion ceofficient // Yin (2017)
 
 
 """======================== Thermodyanic system cals ========================"""
-Elyte_v_SI = Elyte_v*1.0E-9 #
+Elyte_v_SI = Elyte_v*1.0E-9 #m3 // SI volume of electrolyte
 phi = (2+m.cos(theta))*(1-m.cos(theta))**2/4  # - // contact angle correction factor
 
 """========================== Initialization step =========================="""
@@ -53,61 +53,46 @@ phi = (2+m.cos(theta))*(1-m.cos(theta))**2/4  # - // contact angle correction fa
 #intializing the solution vector
 initial = {}
 initial['N'] = N_0
+initial['R'] = R_0
 initial['A'] = A_0
 initial['C_Li'] = C_Li_0
 initial['C_LiO2'] = C_LiO2_0
 sol_vec = list(initial.values())  # solution vector
 print(sol_vec)
-array = np.linspace(0, 1e-6, 500)
-array2 = np.zeros_like(array)
-org = dict(zip(array,array2))
-print (org)
 
 """=========================== Equations ==========================="""
 #%%
 
 
 def residual(t, solution):
-    N, A, C_Li, C_LiO2 = solution
+    N, R, A, C_Li, C_LiO2 = solution
+    print(A)
     a_d = (C_LiO2*N_a)**(-1/3) # length scale of diffusion
     r_crit = 2*gamma_surf*V/(Rbar*T*m.log(C_LiO2/C_LiO2_sat*C_Li/C_Li_sat)) # m // critical radius
     N_crit = 4/3*m.pi*r_crit**3*N_a/V # number of molecules in the critical nucleus of size
     Del_G_Crit = phi*4/3*m.pi*gamma_surf*r_crit**2 # J mol-1 // energy barrier of the nucleation
+    if N_crit <0:
+        Del_G_Crit =0
     Z = m.sqrt(Del_G_Crit/(phi*3*m.pi*k_B*T*N_crit)) # - // Zeldovich factor
     V_crit = 4/3*m.pi*r_crit**3 # m3 // Critical volume
     N_sites = A/(m.pi*r_crit**2) # number of nucleation sites
-    DN_Dt = D_LiO2*a_d*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))
+    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))
     DCLi_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)
     DCLiO2_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)
-    for key in org:
-        if r_crit > float(key):
-            org[key] = N + org[key]
-            break
-    for key in org:
-        if org[key] > 0:
-            R = org[key]
-            X = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(float(key)+D_LiO2/k_surf) - m.pi*float(key)**2*N*gamma_surf*k_surf_des
-            print(R+X)
-            if R+X > float(key):
-                place = org[key]
-                org[key] = 0
-                for key in org:
-                    if R+X > float(key):
-                        org[key]=place
-                        continue
-    DA_Dt = - DN_Dt*m.pi*r_crit**2
-    return [DN_Dt, DA_Dt, DCLi_Dt, DCLiO2_Dt]
+    R_avg = (N*R + DN_Dt*r_crit)/(N + DN_Dt) # m // average radius to be replaced later
+    Dravg_Dt = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(R_avg+D_LiO2/k_surf) - m.pi*R_avg**2*N*gamma_surf*k_surf_des
+    DA_Dt = - DN_Dt*m.pi*r_crit**2 - 2*m.pi*R_avg*Dravg_Dt
+
+    return [DN_Dt, Dravg_Dt, DA_Dt, DCLi_Dt, DCLiO2_Dt]
 
 solution = solve_ivp(residual, [0, time], sol_vec, method='BDF',
         rtol=rtol, atol=atol)
 
-print(org)
 nucleations = solution.y[0]
 area = solution.y[1]
 radius = solution.y[2]
 Li_concentration = solution.y[3]
 
-print(nucleations, Li_concentration)
 t = solution.t
 
 plt.figure(0)

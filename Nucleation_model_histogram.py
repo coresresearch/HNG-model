@@ -37,7 +37,7 @@ C_Li_sat = 0.1 #mol m-3 // saturated concentration of LiO2
 k_nu = 1E-6 #mol s-1 m-2 // kinetic rate constant for the nucleation reaction // Yin (2017)
 k_surf = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
 k_surf_des = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
-gamma_surf = 7.7E-3 #J m-2 //  surface energy of the newly formed crystal phase// Danner (2019) - should be replaced for LiS system
+gamma_surf = 7.7E-2 #J m-2 //  surface energy of the newly formed crystal phase// Danner (2019) - should be replaced for LiS system
 sig_surf = 0.75 # J m-2 // Specific surface energy of Li2O2 with the electrolyte // Yin (2017)
 V = 1.98E-5 #m3 mol-1 // molar volume// Yin (2017)
 theta = 30*m.pi/180 # radians // Contact angle // Danner (2019) - should be replaced for LiS system
@@ -59,11 +59,13 @@ sol_vec_1 = list(initial.values())  # solution vector
 
 """=========================== Equations ==========================="""
 #%%
-radii = np.linspace(1e-10, 1e-6, 500)
+radii = np.linspace(1e-10, 1e-6, 200)
 bin_width = radii[2]-radii[1]
 Nucleation_con = np.zeros_like(radii)
 
 sol_vec = np.hstack([sol_vec_1, Nucleation_con])
+
+data_nuc = pd.DataFrame(index = radii)
 
 def residual(t, sol_vec):
     A, C_Li, C_LiO2 = sol_vec[:3]
@@ -79,42 +81,71 @@ def residual(t, sol_vec):
     Z = m.sqrt(Del_G_Crit/(phi*3*m.pi*k_B*T*N_crit)) # - // Zeldovich factor
     V_crit = 4/3*m.pi*r_crit**3 # m3 // Critical volume
     N_sites = A/(m.pi*r_crit**2) # number of nucleation sites
-    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))
+    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))*1E-20
     for i, r in enumerate(radii):
-        if r_crit > r:
-            n_p[i] = DN_Dt
+        if r > r_crit:
+            Dnp_dt[i] += DN_Dt
             break
     for i, N in enumerate(n_p):
         if N == 0:
-            continue
-        rad = radii[i]
-        Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(rad+D_LiO2/k_surf) - m.pi*rad**2*N*gamma_surf*k_surf_des*1E-5
-        dNdt_radii = Dr_dt[i]/bin_width
-        if dNdt_radii <0 and i > 0:
-            Dnp_dt[i] -= abs(dNdt_radii)
-            Dnp_dt[i-1] += abs(dNdt_radii)
-        elif dNdt_radii> 0 and radii[i] != radii[-1]:
-            Dnp_dt[i] -= abs(dNdt_radii)
-            Dnp_dt[i+1] += abs(dNdt_radii)
+            Dr_dt[i] = 0
+            Dnp_dt[i] += 0
+        else:
+            Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)- m.pi*radii[i]**2*N*gamma_surf*k_surf_des*1E-10
+            dNdt_radii = Dr_dt[i]/bin_width
+            if dNdt_radii <0 and i > 0:
+                Dnp_dt[i] += dNdt_radii
+                Dnp_dt[i-1] -= dNdt_radii
+            elif dNdt_radii > 0 and radii[i] != radii[-1]:
+                Dnp_dt[i] -= dNdt_radii
+                Dnp_dt[i+1] += dNdt_radii
+    data_nuc[C_Li] = Dnp_dt.tolist()
     DCLi_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI) - 2*np.sum(Dr_dt*radii*radii)*np.pi*V_crit/(V*Elyte_v_SI)
     DCLiO2_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)- 2*np.sum(Dr_dt*radii*radii)*np.pi*V_crit/(V*Elyte_v_SI)
     DA_Dt = - DN_Dt*m.pi*r_crit**2 - 4*np.pi*np.sum(radii*Dr_dt)*np.pi
     sol_vectemp = [DA_Dt, DCLi_Dt, DCLiO2_Dt]
-    bundle =np.hstack([sol_vectemp, Dnp_dt])
+    bundle = np.hstack([sol_vectemp, Dnp_dt])
     return bundle
 
 solution = solve_ivp(residual, [0, time], sol_vec, method='BDF',
         rtol=rtol, atol=atol)
 #%%
+data_nuc.to_csv(r'C:\L\Melodie\HNG-model\output.csv')
 Area = solution.y[0]
 Concentration_Li = solution.y[1]
 Concentration_LiO2 = solution.y[2]
+histograms = solution.y[3:]
+t1 = histograms[:,0]
+tmid = histograms[:,18]
+t2 = histograms[:,-1]
+
+plt.figure(3)
+plt.plot(radii, t1)
+plt.xlabel("Radius (s)")
+plt.ylabel("Nuclii (#)")
+
+
+plt.figure(5)
+plt.plot(radii, tmid)
+plt.xlabel("Radius (s)")
+plt.ylabel("Nuclii (#)")
+
+
+
+plt.figure(4)
+plt.plot(radii, t2)
+plt.xlabel("Radius (s)")
+plt.ylabel("Nuclii (#)")
+
+
+#%%
 t = solution.t
 
 plt.figure(0)
 plt.plot(t,Area)
 plt.xlabel("Time (s)")
 plt.ylabel("A (m2)")
+plt.xlim( [0.00004, 0.00009])
 
 plt.figure(1)
 plt.plot(t,Concentration_Li)
@@ -122,6 +153,7 @@ plt.xlabel("Time (s)")
 plt.ylabel("Concentration (mol m-3)")
 plt.show()
 plt.close()
+
 """=========================== Citations ==========================="""
 
 # T. Danner and A. Latz, 2019, 10.1016/j.electacta.2019.134719

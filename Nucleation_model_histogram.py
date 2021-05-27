@@ -91,8 +91,8 @@ def residual(t, sol_vec):
             Dr_dt[i] = 0
             Dnp_dt[i] += 0
         else:
-            Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)- m.pi*radii[i]**2*N*gamma_surf*k_surf_des*1E-10
-            dNdt_radii = Dr_dt[i]/bin_width
+            Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)*1E5- m.pi*radii[i]**2*N*gamma_surf*k_surf_des
+            dNdt_radii = Dr_dt[i]/bin_width*n_p[i]
             if dNdt_radii <0 and i > 0:
                 Dnp_dt[i] += dNdt_radii
                 Dnp_dt[i-1] -= dNdt_radii

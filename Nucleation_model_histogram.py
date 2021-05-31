@@ -87,18 +87,14 @@ def residual(t, sol_vec):
             Dnp_dt[i] += DN_Dt
             break
     for i, N in enumerate(n_p):
-        if N == 0:
-            Dr_dt[i] = 0
-            Dnp_dt[i] += 0
-        else:
-            Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)*1E5- m.pi*radii[i]**2*N*gamma_surf*k_surf_des
-            dNdt_radii = Dr_dt[i]/bin_width*n_p[i]
-            if dNdt_radii <0 and i > 0:
-                Dnp_dt[i] += dNdt_radii
-                Dnp_dt[i-1] -= dNdt_radii
-            elif dNdt_radii > 0 and radii[i] != radii[-1]:
-                Dnp_dt[i] -= dNdt_radii
-                Dnp_dt[i+1] += dNdt_radii
+        Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)*1E5- m.pi*radii[i]**2*N*gamma_surf*k_surf_des
+        dNdt_radii = Dr_dt[i]/bin_width*n_p[i]
+        if dNdt_radii <0 and i > 0:
+            Dnp_dt[i] += dNdt_radii
+            Dnp_dt[i-1] -= dNdt_radii
+        elif dNdt_radii > 0 and radii[i] != radii[-1]:
+            Dnp_dt[i] -= dNdt_radii
+            Dnp_dt[i+1] += dNdt_radii
     data_nuc[C_Li] = Dnp_dt.tolist()
     DCLi_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI) - 2*np.sum(Dr_dt*radii*radii)*np.pi*V_crit/(V*Elyte_v_SI)
     DCLiO2_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)- 2*np.sum(Dr_dt*radii*radii)*np.pi*V_crit/(V*Elyte_v_SI)

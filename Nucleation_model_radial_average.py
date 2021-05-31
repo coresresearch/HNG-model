@@ -25,7 +25,7 @@ Elyte_v =1E-10 #uL // Electrolyte Volume
 N_0 = 0 # // Nucleations
 R_0 = 0
 A_0 = m.pi*0.009**2 #m2 // Cross sectional area
-time = 500000 #s // simulation time
+time = 0.01 #s // simulation time
 atol = 1e-8 # absolute tolerance
 rtol = 1e-4 # relative tolerance
 
@@ -34,8 +34,7 @@ rtol = 1e-4 # relative tolerance
 
 C_LiO2_sat = 0.1 #mol m-3 // saturated concentration of LiO2 //Yin (2017)
 C_Li_sat = 0.1 #mol m-3 // saturated concentration of LiO2
-k_nu = 1E-6 #mol s-1 m-2 // kinetic rate constant for the nucleation reaction // Yin (2017)
-k_surf = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
+k_surf = 1E-15 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
 k_surf_des = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
 gamma_surf = 7.7E-3 #J m-2 //  surface energy of the newly formed crystal phase// Danner (2019) - should be replaced for LiS system
 sig_surf = 0.75 # J m-2 // Specific surface energy of Li2O2 with the electrolyte // Yin (2017)
@@ -66,7 +65,6 @@ print(sol_vec)
 
 def residual(t, solution):
     N, R, A, C_Li, C_LiO2 = solution
-    print(A)
     a_d = (C_LiO2*N_a)**(-1/3) # length scale of diffusion
     r_crit = 2*gamma_surf*V/(Rbar*T*m.log(C_LiO2/C_LiO2_sat*C_Li/C_Li_sat)) # m // critical radius
     N_crit = 4/3*m.pi*r_crit**3*N_a/V # number of molecules in the critical nucleus of size
@@ -76,11 +74,11 @@ def residual(t, solution):
     Z = m.sqrt(Del_G_Crit/(phi*3*m.pi*k_B*T*N_crit)) # - // Zeldovich factor
     V_crit = 4/3*m.pi*r_crit**3 # m3 // Critical volume
     N_sites = A/(m.pi*r_crit**2) # number of nucleation sites
-    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))
-    DCLi_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)
-    DCLiO2_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI)
+    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))*1E-15
     R_avg = (N*R + DN_Dt*r_crit)/(N + DN_Dt) # m // average radius to be replaced later
     Dravg_Dt = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(R_avg+D_LiO2/k_surf) - m.pi*R_avg**2*N*gamma_surf*k_surf_des
+    DCLi_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI) - 2*R_avg*Dravg_Dt*np.pi*V_crit/(V*Elyte_v_SI)
+    DCLiO2_Dt = -DN_Dt*V_crit/(V*Elyte_v_SI) - 2*R_avg*Dravg_Dt*np.pi*V_crit/(V*Elyte_v_SI)
     DA_Dt = - DN_Dt*m.pi*r_crit**2 - 2*m.pi*R_avg*Dravg_Dt
 
     return [DN_Dt, Dravg_Dt, DA_Dt, DCLi_Dt, DCLiO2_Dt]
@@ -104,6 +102,13 @@ plt.figure(1)
 plt.plot(t,Li_concentration)
 plt.xlabel("Time (s)")
 plt.ylabel("Concentration (mol m-3)")
+plt.show()
+plt.close()
+
+plt.figure(3)
+plt.plot(t,radius)
+plt.xlabel("Time (s)")
+plt.ylabel("radius(m)")
 plt.show()
 plt.close()
 """=========================== Citations ==========================="""

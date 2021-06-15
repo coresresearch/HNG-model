@@ -34,7 +34,6 @@ rtol = 1e-4 # relative tolerance
 
 C_LiO2_sat = 0.1 #mol m-3 // saturated concentration of LiO2 //Yin (2017)
 C_Li_sat = 0.1 #mol m-3 // saturated concentration of LiO2
-k_nu = 1E-6 #mol s-1 m-2 // kinetic rate constant for the nucleation reaction // Yin (2017)
 k_surf = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
 k_surf_des = 1E-8 #mol s-1 m-2 // kinetic rate constant for desorption // Yin (2017)
 gamma_surf = 7.7E-2 #J m-2 //  surface energy of the newly formed crystal phase// Danner (2019) - should be replaced for LiS system
@@ -81,7 +80,8 @@ def residual(t, sol_vec):
     Z = m.sqrt(Del_G_Crit/(phi*3*m.pi*k_B*T*N_crit)) # - // Zeldovich factor
     V_crit = 4/3*m.pi*r_crit**3 # m3 // Critical volume
     N_sites = A/(m.pi*r_crit**2) # number of nucleation sites
-    DN_Dt = D_LiO2*(a_d**-2)*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))*1E-20
+    k_nuc= D_LiO2*(a_d**-2) #nucleation rate calculated based on the distance between particles
+    DN_Dt = k_nuc*N_sites*Z*m.exp(-Del_G_Crit/(k_B*T))*1E-20
     for i, r in enumerate(radii):
         if r > r_crit:
             Dnp_dt[i] += DN_Dt

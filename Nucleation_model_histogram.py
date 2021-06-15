@@ -36,7 +36,7 @@ C_LiO2_sat = 0.1 #mol m-3 // saturated concentration of LiO2 //Yin (2017)
 C_Li_sat = 0.1 #mol m-3 // saturated concentration of LiO2
 k_nu = 1E-6 #mol s-1 m-2 // kinetic rate constant for the nucleation reaction // Yin (2017)
 k_surf = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
-k_surf_des = 1E-8 #mol s-1 m-2 // kinetic rate constant for the growth reaction // Yin (2017)
+k_surf_des = 1E-8 #mol s-1 m-2 // kinetic rate constant for desorption // Yin (2017)
 gamma_surf = 7.7E-2 #J m-2 //  surface energy of the newly formed crystal phase// Danner (2019) - should be replaced for LiS system
 sig_surf = 0.75 # J m-2 // Specific surface energy of Li2O2 with the electrolyte // Yin (2017)
 V = 1.98E-5 #m3 mol-1 // molar volume// Yin (2017)
@@ -87,11 +87,12 @@ def residual(t, sol_vec):
             Dnp_dt[i] += DN_Dt
             break
     for i, N in enumerate(n_p):
-        Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)*1E5- m.pi*radii[i]**2*N*gamma_surf*k_surf_des
-        dNdt_radii = Dr_dt[i]/bin_width*n_p[i]
-        if dNdt_radii <0 and i > 0:
+        Dr_dt[i] = D_LiO2*V*(C_Li- C_Li_sat)*(C_LiO2-C_LiO2_sat)/(radii[i]+D_LiO2/k_surf)- m.pi*radii[i]**2*N*gamma_surf*k_surf_des
+        dNdt_radii = Dr_dt[i]/bin_width*N
+        if dNdt_radii <0:
             Dnp_dt[i] += dNdt_radii
-            Dnp_dt[i-1] -= dNdt_radii
+            if i > 0:
+                Dnp_dt[i-1] -= dNdt_radii
         elif dNdt_radii > 0 and radii[i] != radii[-1]:
             Dnp_dt[i] -= dNdt_radii
             Dnp_dt[i+1] += dNdt_radii
@@ -106,7 +107,7 @@ def residual(t, sol_vec):
 solution = solve_ivp(residual, [0, time], sol_vec, method='BDF',
         rtol=rtol, atol=atol)
 #%%
-data_nuc.to_csv(r'C:\L\Melodie\HNG-model\output.csv')
+data_nuc.to_csv(r'C:\Users\Mels\Code\HNG-model\output.csv')
 Area = solution.y[0]
 Concentration_Li = solution.y[1]
 Concentration_LiO2 = solution.y[2]

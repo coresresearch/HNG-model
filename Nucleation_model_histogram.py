@@ -75,11 +75,9 @@ def residual(t, sol_vec):
     A, C_Li, C_LiO2 = sol_vec[:3]
     n_p = sol_vec[3:]
     N_tot = sum(n_p)
-    print(N_tot)
     for key in pack_frac_dictionary:
         if N_tot >= key:
             pack_frac = pack_frac_dictionary[key]
-            print(pack_frac)
             break
     pack_frac = 0.875
     # Initialize derivatives:
@@ -96,12 +94,8 @@ def residual(t, sol_vec):
         / (RT * m.log(C_LiO2 / C_LiO2_sat * C_Li / C_Li_sat))) 
     
     # number of moles in the nucleus with radius r_crit
-    N_crit = 4./3.*m.pi*r_crit**3./v_Li2O2 
-    """Is the division by 3 correct? If I'm guessing correctly, this is surface area, 4pi r_crit^2...
-        I think it is correct because its the number of moles in the nucleus so it would volume / molar volar
-        Though it does bring up an interesting thought: a hemishpere volume is 2/3 so we might want to change it actually?
-        https://www.sciencedirect.com/science/article/pii/S0013468619315907 its in here after equation 34
-    """
+    N_crit = 2./3.*m.pi*r_crit**3./v_Li2O2 
+
     # J mol-1 // energy barrier of the nucleation
     dG_crit = phi*4./3.*m.pi*gamma_surf*r_crit**2 
     if N_crit <0:
@@ -114,9 +108,8 @@ def residual(t, sol_vec):
     """TODO: incorporate max packing fraction for circles."""
     N_sites = A/(m.pi*r_crit**2)*pack_frac # number of nucleation sites
     k_nuc= D_LiO2*(a_d**-2) #nucleation rate calculated based on the distance between particles
-    """Should k_B*T be R*T, here, since Del_G_Crit is in J/mol?
-    I think it should be K_b*T because K_b is J/K or is that what you were asking?"""
-    DN_Dt = k_nuc*N_sites*Z*m.exp(-dG_crit/k_B*T)*1E-20
+    
+    DN_Dt = k_nuc*N_sites*Z*m.exp(-dG_crit/RT)
     for i, r in enumerate(radii):
         if r > r_crit:
             Dnp_dt[i] += DN_Dt

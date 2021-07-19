@@ -15,6 +15,9 @@ k_B = 1.380649E-23 #J K-1 // Boltzmann's constant
 ep_0 = 8.854E-12  #F m-1 // electric permittivity of a vacuum
 N_a = 6.022E23 #mol-1 // Avogadro's number
 Rbar = 8.3145 #J mol-1 K-1 // Ideal constant
+#packing fraction dictionary based on number of nucleii #there is a more complicated formula for nucleii of different sizes that I will implement later 
+#
+pack_frac_dictionary = {0:0.9, 50: 0.8558, 100: 0.85, 150: 0.8512, 200: 0.8479, 250: 0.8483, 300: 0.8501, 350: 0.8464, 400: 0.8412, 450: 0.8401, 500: 0.8384, 550: 0.8376, 600: 0.8376, 650: 0.8363, 700: 0.8359, 750: 0.8352, 800: 0.8335, 850: 0.833, 900: 0.833, 950: 0.8326, 1000: 0.8319}
 
 """======================== User system variables ========================="""
 #Parameters that can be changed during the trials
@@ -46,7 +49,7 @@ D_LiO2 = 1.2E-9 #m2 -s-1 // diffusion ceofficient // Yin (2017)
 
 """======================= Thermodyanic system calcs ========================"""
 Elyte_v_SI = Elyte_v*1.0E-9 # Convert to m3
-phi = (2+m.cos(theta))*(1-m.cos(theta))**2/4  # - // contact angle correction factor
+phi = (2+m.cos(theta))*(1-m.cos(theta))**2./4.  # - // contact angle correction factor
 
 """========================== Initialization step =========================="""
 #intializing the solution vector
@@ -71,7 +74,14 @@ def residual(t, sol_vec):
     # Read out current state:
     A, C_Li, C_LiO2 = sol_vec[:3]
     n_p = sol_vec[3:]
-
+    N_tot = sum(n_p)
+    print(N_tot)
+    for key in pack_frac_dictionary:
+        if N_tot >= key:
+            pack_frac = pack_frac_dictionary[key]
+            print(pack_frac)
+            break
+    pack_frac = 0.875
     # Initialize derivatives:
     Dnp_dt = np.zeros_like(n_p)
     Dr_dt = np.zeros_like(n_p)
@@ -87,20 +97,26 @@ def residual(t, sol_vec):
     
     # number of moles in the nucleus with radius r_crit
     N_crit = 4./3.*m.pi*r_crit**3./v_Li2O2 
-    """Is the division by 3 correct? If I'm guessing correctly, this is surface area, 4pi r_crit^2..."""
+    """Is the division by 3 correct? If I'm guessing correctly, this is surface area, 4pi r_crit^2...
+        I think it is correct because its the number of moles in the nucleus so it would volume / molar volar
+        Though it does bring up an interesting thought: a hemishpere volume is 2/3 so we might want to change it actually?
+        https://www.sciencedirect.com/science/article/pii/S0013468619315907 its in here after equation 34
+    """
     # J mol-1 // energy barrier of the nucleation
     dG_crit = phi*4./3.*m.pi*gamma_surf*r_crit**2 
     if N_crit <0:
         dG_crit = 0
 
-    """Make sure the units work out, here."""
+    """Make sure the units work out, here.
+    Units check out with disclaimer see ppt"""
     Z = m.sqrt(dG_crit/(phi * 3. * m.pi * RT * N_crit)) # - // Zeldovich factor
     V_crit = 4./3. * m.pi * r_crit**3 # m3 // Critical volume
     """TODO: incorporate max packing fraction for circles."""
-    N_sites = A/(m.pi*r_crit**2) # number of nucleation sites
+    N_sites = A/(m.pi*r_crit**2)*pack_frac # number of nucleation sites
     k_nuc= D_LiO2*(a_d**-2) #nucleation rate calculated based on the distance between particles
-    """Should k_B*T be R*T, here, since Del_G_Crit is in J/mol?"""
-    DN_Dt = k_nuc*N_sites*Z*m.exp(-dG_crit/RT)*1E-20
+    """Should k_B*T be R*T, here, since Del_G_Crit is in J/mol?
+    I think it should be K_b*T because K_b is J/K or is that what you were asking?"""
+    DN_Dt = k_nuc*N_sites*Z*m.exp(-dG_crit/k_B*T)*1E-20
     for i, r in enumerate(radii):
         if r > r_crit:
             Dnp_dt[i] += DN_Dt
